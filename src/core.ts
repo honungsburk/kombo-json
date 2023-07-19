@@ -1,19 +1,5 @@
 import * as P from "@honungsburk/kombo/Simple";
-
-/**
- * A JSON value.
- *
- * Spec: https://www.json.org/json-en.html
- */
-export type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonObject
-  | JsonArray;
-export type JsonObject = { [key: string]: JsonValue };
-export type JsonArray = JsonValue[];
+import type { JsonValue, JsonObject, JsonArray } from "./types.js";
 
 /**
  * Whitespace
@@ -119,7 +105,7 @@ export const stringParser: P.Parser<string> = P.succeed((chars: string[]) =>
   .skip(P.symbol('"'));
 
 // Value
-export const jsonValue: P.Parser<JsonValue> = whitespaceParser
+export const valueParser: P.Parser<JsonValue> = whitespaceParser
   .keep(
     P.oneOfMany<JsonValue>(
       nullParser,
@@ -144,7 +130,7 @@ export const objectParser: P.Parser<JsonObject> = P.sequence({
     .skip(whitespaceParser)
     .skip(P.symbol(":"))
     .skip(whitespaceParser)
-    .apply(jsonValue),
+    .apply(valueParser),
   trailing: P.Trailing.Forbidden,
 }).map((items) => Object.fromEntries(items));
 
@@ -154,6 +140,6 @@ export const arrayParser: P.Parser<JsonArray> = P.sequence({
   seperator: ",",
   end: "]",
   spaces: whitespaceParser,
-  item: jsonValue,
+  item: valueParser,
   trailing: P.Trailing.Forbidden,
 }).map((items) => items.toArray());
