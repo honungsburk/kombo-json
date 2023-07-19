@@ -1,88 +1,336 @@
-import * as P from "@honungsburk/kombo/Simple";
+import * as A from "@honungsburk/kombo/Advanced";
+import {
+  Parser,
+  DeadEnd,
+  Located,
+  getContext,
+} from "@honungsburk/kombo/Parser";
 import type { JsonValue, JsonObject, JsonArray } from "./types.js";
+
+// Error
+
+export enum Ctx {
+  Value = "Value",
+  Object = "Object",
+  ObjectKey = "ObjectKey",
+  ObjectValue = "ObjectValue",
+  Array = "Array",
+  ArrayValue = "ArrayValue",
+  String = "String",
+  Number = "Number",
+  Exponent = "Exponent",
+  Fraction = "Fraction",
+  Unicode = "Unicode",
+}
+
+function ctxToString(ctx: Ctx): string {
+  switch (ctx) {
+    case Ctx.Value:
+      return "Cannot parse this value.";
+    case Ctx.Object:
+      return "Cannot parse this object.";
+    case Ctx.ObjectKey:
+      return "Cannot parse this object key.";
+    case Ctx.ObjectValue:
+      return "Cannot parse this object value.";
+    case Ctx.Array:
+      return "Cannot parse this array.";
+    case Ctx.ArrayValue:
+      return "Cannot parse this array value.";
+    case Ctx.String:
+      return "Cannot parse this string.";
+    case Ctx.Number:
+      return "Cannot parse this number.";
+    case Ctx.Exponent:
+      return "Cannot parse the exponent in this number.";
+    case Ctx.Fraction:
+      return "Cannot parse the fraction in this number.";
+    case Ctx.Unicode:
+      return "Cannot parse the unicode hex in this string.";
+  }
+}
+export enum Err {
+  ExpectedBool = "ExpectedBool",
+  ExpectedNull = "ExpectedNull",
+  ExpectedNumber = "ExpectedNumber",
+  ExpectedDigit = "ExpectedDigit",
+  ExpectedSign = "ExpectedSign",
+  ExpectedExponentE = "ExpectedExponentE",
+  ExpectedDecimalSeparator = "ExpectedDecimalSeparator",
+  ExpectedString = "ExpectedString",
+  ExpectedDoubleQuote = "ExpectedDoubleQuote",
+  ExpectedChar = "ExpectedChar",
+  ExpectedUnicodeU = "ExpectedUnicodeU",
+  ExpectedUnicodeHex = "ExpectedUnicodeHex",
+  ExpectedEscapedCharacter = "ExpectedEscapedCharacter",
+  ExpectedObject = "ExpectedObject",
+  ExpectedArray = "ExpectedArray",
+  ExpectedLeftBrace = "ExpectedLeftBrace",
+  ExpectedRightBrace = "ExpectedRightBrace",
+  ExpectedObjectSeparator = "ExpectedObjectSeparator",
+  ExpectedKeyValueSeparator = "ExpectedKeyValueSeparator",
+  ExpectedLeftBracket = "ExpectedLeftBracket",
+  ExpectedRightBracket = "ExpectedRightBracket",
+  ExpectedArraySeparator = "ExpectedArraySeparator",
+}
+
+export function tipGenerator(ctx: Ctx, err: Err): string[] {
+  if (ctx === Ctx.ObjectKey) {
+    return ['"key": value', '"name": "John Doe"', '"age": 42'];
+  }
+
+  if (err === Err.ExpectedBool) {
+    return ["true", "false"];
+  }
+
+  if (err === Err.ExpectedNull) {
+    return ["null"];
+  }
+
+  if (err === Err.ExpectedNumber) {
+    return ["42", "3.14", "-1", "-3.14", "0.1", "1e3", "1e-3"];
+  }
+
+  if (err === Err.ExpectedDigit) {
+    return ["0", "1", "2", "..."];
+  }
+
+  if (err === Err.ExpectedSign) {
+    return ["+", "-"];
+  }
+
+  if (err === Err.ExpectedExponentE) {
+    return ["1e3", "1E-3"];
+  }
+
+  if (err === Err.ExpectedDecimalSeparator) {
+    return ["1.0", "1.11234", "1.2865", "..."];
+  }
+
+  if (err === Err.ExpectedString) {
+    return ['"hello"', '"world"', '"foo"', '"bar"'];
+  }
+
+  if (err === Err.ExpectedChar) {
+    return ['"a"', '"b"', '"c"', '"d"', "..."];
+  }
+
+  if (err === Err.ExpectedUnicodeU) {
+    return [
+      '"\\u1234"',
+      '"\\uabcd"',
+      '"\\uABCD"',
+      '"\\u1234ABCD"',
+      '"\\u1234abcd"',
+    ];
+  }
+
+  return [];
+}
+
+export function errToString(error: Err): string {
+  switch (error) {
+    case Err.ExpectedBool:
+      return "Expected a boolean value";
+    case Err.ExpectedNull:
+      return "Expected a null value";
+    case Err.ExpectedNumber:
+      return "Expected a number";
+    case Err.ExpectedDigit:
+      return "Expected a digit";
+    case Err.ExpectedSign:
+      return "Expected a sign: '+' or '-'";
+    case Err.ExpectedExponentE:
+      return "Expected an exponent.";
+    case Err.ExpectedDecimalSeparator:
+      return "Expected a decimal separator";
+    case Err.ExpectedString:
+      return "Expected a string";
+    case Err.ExpectedDoubleQuote:
+      return 'Expected a double quote: "';
+    case Err.ExpectedChar:
+      return "Expected a character.";
+    case Err.ExpectedUnicodeU:
+      return "Expected a unicode 'u'";
+    case Err.ExpectedUnicodeHex:
+      return "Expected a unicode hex.";
+    case Err.ExpectedEscapedCharacter:
+      return "Expected an escaped character.";
+    case Err.ExpectedObject:
+      return "Expected an object";
+    case Err.ExpectedArray:
+      return "Expected an array";
+    case Err.ExpectedLeftBrace:
+      return "Expected a left brace: '{'";
+    case Err.ExpectedRightBrace:
+      return "Expected a right brace: '}'";
+    case Err.ExpectedObjectSeparator:
+      return "Expected an object separator: ','";
+    case Err.ExpectedKeyValueSeparator:
+      return "Expected a key value separator: ':'";
+    case Err.ExpectedLeftBracket:
+      return "Expected a left bracket: '['";
+    case Err.ExpectedRightBracket:
+      return "Expected a right bracket: ']'";
+    case Err.ExpectedArraySeparator:
+      return "Expected an array separator: ','";
+  }
+}
+
+function composeErrorMessage(
+  intro: string,
+  faultyLine: string,
+  lineNumber: number,
+  underline: readonly [number, number],
+  explanation: string,
+  tips: string[]
+): string {
+  const preFaultyLine = `${lineNumber}|    `;
+
+  const explainer =
+    tips.length === 0
+      ? [explanation]
+      : [
+          explanation + " Here are some examples:",
+          "",
+          ...tips.map((tip) => "    " + tip),
+        ];
+
+  return [
+    intro,
+    "",
+    preFaultyLine + faultyLine,
+    " ".repeat(underline[0] + preFaultyLine.length) +
+      "^".repeat(underline[1] - underline[0] + 1),
+    ...explainer,
+  ].join("\n");
+}
+
+export const failureToString = (
+  src: string,
+  errorStack: DeadEnd<Ctx, Err>[]
+): string | undefined => {
+  const error = errorStack[0];
+
+  if (error === undefined) {
+    return undefined;
+  }
+
+  const top = error.contextStack.peek();
+
+  const context: Ctx = top === undefined ? Ctx.Value : getContext(top);
+
+  const intro = ctxToString(context);
+  const example = src.split("\n")[error.row - 1];
+  const underline = [error.col - 1, error.col - 1] as const;
+  const explenation = errToString(error.problem);
+  const tips = tipGenerator(context, error.problem);
+
+  return composeErrorMessage(
+    intro,
+    example,
+    error.row,
+    underline,
+    explenation,
+    tips
+  );
+};
 
 /**
  * Whitespace
  */
-export const whitespaceParser = P.chompWhile(
+export const whitespaceParser: Parser<false, never, never> = A.chompWhile(
   (c) => c === " " || c === "\n" || c === "\r" || c === "\t"
 );
 
 // Null
-export const nullParser: P.Parser<null> = P.succeed(null).skip(
-  P.symbol("null")
+export const nullParser = A.succeed(null).skip(
+  A.symbol(A.Token("null", Err.ExpectedNull))
 );
 
 // Bool
 
-const trueParser = P.succeed(true).skip(P.symbol("true"));
-const falseParser = P.succeed(false).skip(P.symbol("false"));
+const trueParser = A.succeed(true).skip(
+  A.symbol(A.Token("true", Err.ExpectedBool))
+);
+const falseParser = A.succeed(false).skip(
+  A.symbol(A.Token("false", Err.ExpectedBool))
+);
 
-export const boolParser: P.Parser<boolean> = trueParser.or(falseParser);
+export const boolParser = trueParser.or(falseParser);
 
 // Number
 
 const isDigit = (c: string) => c >= "0" && c <= "9";
 
-const digitsParser = P.chompWhile1(isDigit)
+const digitsParser = A.chompWhile1(Err.ExpectedDigit, isDigit)
   .getChompedString()
   .map(Number.parseInt);
 
-const fractionParser = P.succeed((n: string) => parseInt(n) / 10 ** n.length)
-  .skip(P.symbol("."))
-  .apply(P.chompWhile1(isDigit).getChompedString());
-
-const signParser = P.succeed((sign: string) => (sign === "-" ? -1 : 1)).apply(
-  P.chompIf((c) => c === "-" || c === "+")
-    .getChompedString()
-    .or(P.succeed("+"))
+const fractionParser = A.inContext(Ctx.Fraction)(
+  A.succeed((n: string) => parseInt(n) / 10 ** n.length)
+    .skip(A.symbol(A.Token(".", Err.ExpectedDecimalSeparator)))
+    .apply(A.chompWhile1(Err.ExpectedDigit, isDigit).getChompedString())
 );
 
-const exponentParser = P.succeed(
-  (sign: number) => (e: number) => 10 ** (sign * e)
-)
-  .skip(P.chompIf((c) => c === "e" || c === "E"))
-  .apply(signParser)
-  .apply(digitsParser);
+const signParser = A.succeed((sign: string) => (sign === "-" ? -1 : 1)).apply(
+  A.chompIf((c) => c === "-" || c === "+")(Err.ExpectedSign)
+    .getChompedString()
+    .or(A.succeed("+"))
+);
 
-export const numberParser: P.Parser<number> = P.succeed(
-  (sign: number) => (n: number) => (fraction: number) => (exponent: number) =>
-    sign * (n + fraction) * exponent
-)
-  .apply(
-    P.chompIf((c) => c === "-")
-      .map(() => -1)
-      .or(P.succeed(1))
+const exponentParser = A.inContext(Ctx.Exponent)(
+  A.succeed((sign: number) => (e: number) => 10 ** (sign * e))
+    .skip(A.chompIf((c) => c === "e" || c === "E")(Err.ExpectedExponentE))
+    .apply(signParser)
+    .apply(digitsParser)
+);
+
+export const numberParser: Parser<number, never, Err> = A.inContext(Ctx.Number)(
+  A.succeed(
+    (sign: number) => (n: number) => (fraction: number) => (exponent: number) =>
+      sign * (n + fraction) * exponent
   )
-  .apply(digitsParser)
-  .apply(fractionParser.or(P.succeed(0)))
-  .apply(exponentParser.or(P.succeed(1)));
+    .apply(
+      A.chompIf((c) => c === "-")(Err.ExpectedNumber)
+        .map(() => -1)
+        .or(A.succeed(1))
+    )
+    .apply(digitsParser)
+    .apply(fractionParser.or(A.succeed(0)))
+    .apply(exponentParser.or(A.succeed(1)))
+);
 
 // String
 
-export const unicodeParser: P.Parser<string> = P.succeed((s: string) =>
-  String.fromCodePoint(parseInt(s, 16))
-)
-  .skip(P.symbol("u"))
-  .apply(
-    P.chompWhile1(
-      (c) =>
-        (c >= "0" && c <= "9") ||
-        (c >= "a" && c <= "f") ||
-        (c >= "A" && c <= "F")
-    ).getChompedString()
-  );
+export const unicodeParser: Parser<string, never, Err> = A.inContext(
+  Ctx.Unicode
+)(
+  A.succeed((s: string) => String.fromCodePoint(parseInt(s, 16)))
+    .skip(A.symbol(A.Token("u", Err.ExpectedUnicodeU)))
+    .apply(
+      A.chompWhile1(
+        Err.ExpectedUnicodeHex,
+        (c) =>
+          (c >= "0" && c <= "9") ||
+          (c >= "a" && c <= "f") ||
+          (c >= "A" && c <= "F")
+      ).getChompedString()
+    )
+);
 
-export const escapeParser: P.Parser<string> = P.symbol("\\").keep(
-  P.oneOfMany<string>(
-    P.symbol("n").map(() => "\n"),
-    P.symbol("r").map(() => "\r"),
-    P.symbol("\\").map(() => "\\"),
-    P.symbol("b").map(() => "\b"),
-    P.symbol("f").map(() => "\f"),
-    P.symbol("t").map(() => "\t"),
-    P.symbol("/").map(() => "/"),
-    P.symbol('"').map(() => '"'),
+export const escapeParser: Parser<string, never, Err> = A.symbol(
+  A.Token("\\", Err.ExpectedEscapedCharacter)
+).keep(
+  A.oneOfMany(
+    A.symbol(A.Token("n", Err.ExpectedEscapedCharacter)).map(() => "\n"),
+    A.symbol(A.Token("r", Err.ExpectedEscapedCharacter)).map(() => "\r"),
+    A.symbol(A.Token("\\", Err.ExpectedEscapedCharacter)).map(() => "\\"),
+    A.symbol(A.Token("b", Err.ExpectedEscapedCharacter)).map(() => "\b"),
+    A.symbol(A.Token("f", Err.ExpectedEscapedCharacter)).map(() => "\f"),
+    A.symbol(A.Token("t", Err.ExpectedEscapedCharacter)).map(() => "\t"),
+    A.symbol(A.Token("/", Err.ExpectedEscapedCharacter)).map(() => "/"),
+    A.symbol(A.Token('"', Err.ExpectedEscapedCharacter)).map(() => '"'),
     unicodeParser
   )
 );
@@ -91,55 +339,69 @@ export const escapeParser: P.Parser<string> = P.symbol("\\").keep(
 const bottomChar = String.fromCodePoint(0x0020);
 const topChar = String.fromCodePoint(0x10ffff);
 
-const charParser = P.chompIf(
+const charParser = A.chompIf(
   (c) => c !== '"' && c !== "\\" && c >= bottomChar && c <= topChar
-).getChompedString();
+)(Err.ExpectedChar).getChompedString();
 
-const characterParser = P.oneOf(escapeParser, charParser);
+const characterParser = A.oneOf(escapeParser, charParser);
 
-export const stringParser: P.Parser<string> = P.succeed((chars: string[]) =>
-  chars.join("")
+export const stringParser: Parser<string, never, Err> = A.inContext(Ctx.String)(
+  A.succeed((chars: string[]) => chars.join(""))
 )
-  .skip(P.symbol('"'))
-  .apply(P.many(characterParser))
-  .skip(P.symbol('"'));
+  .skip(A.symbol(A.Token('"', Err.ExpectedDoubleQuote)))
+  .apply(A.many(characterParser))
+  .skip(A.symbol(A.Token('"', Err.ExpectedDoubleQuote)));
 
 // Value
-export const valueParser: P.Parser<JsonValue> = whitespaceParser
-  .keep(
-    P.oneOfMany<JsonValue>(
-      nullParser,
-      boolParser,
-      numberParser,
-      stringParser,
-      P.lazy(() => objectParser),
-      P.lazy(() => arrayParser)
+export const valueParser: Parser<JsonValue, never, Err> = A.inContext(
+  Ctx.Value
+)(
+  whitespaceParser
+    .keep(
+      A.oneOfMany<JsonValue, never, Err>(
+        nullParser,
+        boolParser,
+        numberParser,
+        stringParser,
+        A.lazy(() => objectParser),
+        A.lazy(() => arrayParser)
+      )
     )
-  )
-  .skip(whitespaceParser);
+    .skip(whitespaceParser)
+);
 
 // Object
-export const objectParser: P.Parser<JsonObject> = P.sequence({
-  start: "{",
-  seperator: ",",
-  end: "}",
-  spaces: P.spaces,
-  item: P.succeed((key: string) => (value: JsonValue) => [key, value] as const)
-    .skip(whitespaceParser)
-    .apply(stringParser)
-    .skip(whitespaceParser)
-    .skip(P.symbol(":"))
-    .skip(whitespaceParser)
-    .apply(valueParser),
-  trailing: P.Trailing.Forbidden,
-}).map((items) => Object.fromEntries(items));
+export const objectParser: Parser<JsonObject, never, Err> = A.inContext(
+  Ctx.Object
+)(
+  A.sequence({
+    start: A.Token("{", Err.ExpectedLeftBrace),
+    separator: A.Token(",", Err.ExpectedObjectSeparator),
+    end: A.Token("}", Err.ExpectedRightBrace),
+    spaces: A.spaces,
+    item: A.succeed(
+      (key: string) => (value: JsonValue) => [key, value] as const
+    )
+      .skip(whitespaceParser)
+      .apply(A.inContext(Ctx.ObjectKey)(stringParser))
+      .skip(whitespaceParser)
+      .skip(A.symbol(A.Token(":", Err.ExpectedKeyValueSeparator)))
+      .skip(whitespaceParser)
+      .apply(A.inContext(Ctx.ObjectValue)(valueParser)),
+    trailing: A.Trailing.Forbidden,
+  }).map((items) => Object.fromEntries(items))
+);
 
 // Array
-export const arrayParser: P.Parser<JsonArray> = P.sequence({
-  start: "[",
-  seperator: ",",
-  end: "]",
-  spaces: whitespaceParser,
-  item: valueParser,
-  trailing: P.Trailing.Forbidden,
-}).map((items) => items.toArray());
+export const arrayParser: Parser<JsonArray, never, Err> = A.inContext(
+  Ctx.Array
+)(
+  A.sequence({
+    start: A.Token("[", Err.ExpectedLeftBracket),
+    separator: A.Token(",", Err.ExpectedArraySeparator),
+    end: A.Token("]", Err.ExpectedRightBracket),
+    spaces: whitespaceParser,
+    item: valueParser,
+    trailing: A.Trailing.Forbidden,
+  }).map((items) => items.toArray())
+);

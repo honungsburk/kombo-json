@@ -3,6 +3,7 @@ import { expect } from "@japa/expect";
 import { specReporter } from "@japa/spec-reporter";
 // import { runFailedTests } from "@japa/run-failed-tests";
 import { processCliArgs, configure, run } from "@japa/runner";
+import { snapshot } from "@japa/snapshot";
 
 /*
 |--------------------------------------------------------------------------
@@ -21,7 +22,7 @@ configure({
   ...processCliArgs(process.argv.slice(2)),
   ...{
     files: ["src/**/*.spec.ts"],
-    plugins: [expect()], //runFailedTests()], //, apiClient("http://localhost:3333")],
+    plugins: [expect(), snapshot()], //runFailedTests()], //, apiClient("http://localhost:3333")],
     // @ts-ignore
     importer: (filePath: any) => import(filePath),
     reporters: [specReporter()],

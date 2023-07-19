@@ -1,14 +1,15 @@
 import { test, Group } from "@japa/runner";
 import * as Core from "./core.js";
-import { Parser } from "@honungsburk/kombo/Simple";
+import { Parser } from "@honungsburk/kombo/Parser";
 import * as Kombo from "@honungsburk/kombo";
 import * as Result from "@honungsburk/kombo/Result";
 import { Expect } from "@japa/expect";
+import fs from "fs";
 
 // Helper functions for testing parsers.
 
 const testSuccessBuilder =
-  <A>(parser: Parser<A>) =>
+  <A, CTX, PROBELM>(parser: Parser<A, CTX, PROBELM>) =>
   (description: string, input: string, expected: A) => {
     return test(description, ({ expect }) => {
       const result = parser.run(input);
@@ -17,7 +18,7 @@ const testSuccessBuilder =
   };
 
 const testFailSimpleBuilder =
-  <A>(parser: Parser<A>) =>
+  <A, CTX, PROBELM>(parser: Parser<A, CTX, PROBELM>) =>
   (description: string, input: string) => {
     return test(description, ({ expect }) => {
       const result = parser.run(input);
@@ -251,3 +252,49 @@ test.group("objectParser", (group: Group) => {
   testObjectFail("fails on leading space", " {}");
   testObjectFail("fails on missing comma", '{"a":1 "b":2}');
 });
+
+// Error messages
+
+test.group("failureToString", (group: Group) => {
+  test("returns undefined if there is no error", ({ expect }) => {
+    expect(Core.failureToString("", [])).toBeUndefined();
+  });
+
+  test("returns the error message if there is an error", ({ expect }) => {
+    const src = "a";
+    const res = Core.numberParser.run(src);
+    expect(res.kind).toEqual("Err");
+    // expectProblem(expect, res, [Core.Err.ExpectedNumber]);
+    if (Result.isErr(res)) {
+      expect(Core.failureToString(src, res.value)).toEqual("");
+    }
+  });
+
+  test("golden test", async ({ expect }) => {
+    const files = await readFiles(
+      "/Users/frankhampusweslien/git/private/kombo/kombo-json/jsonTestExamples/invalid"
+    );
+
+    files.forEach((file) => {
+      const res = Core.valueParser.run(file);
+      expect(res.kind).toEqual("Err");
+      if (Result.isErr(res)) {
+        expect(Core.failureToString(file, res.value)).toMatchSnapshot();
+      }
+    });
+  })
+    .pin()
+    .tags(["golden"]);
+});
+
+const invalidDir = new URL(
+  "../jsonTestExamples/invalid",
+  import.meta.url
+).toString();
+
+async function readFiles(dir: string): Promise<string[]> {
+  const files = await fs.promises.readdir(dir);
+  return Promise.all(
+    files.map((f) => fs.promises.readFile(`${dir}/${f}`, "utf-8"))
+  );
+}

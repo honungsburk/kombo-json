@@ -1,6 +1,9 @@
-import * as Core from "./core.js";
-import * as Types from "./types.js";
+/**
+ * This is the module you most likely want to use. There is also the {@link core:namespace | Core module} but
+ * it exposes a lot of internal types and functions that you probably do not want to use.
+ *
+ * @packageDocumentation
+ */
 
-const parser = Core.valueParser;
-
-export { Core, Types, parser };
+export { Err, valueParser as parser, type Ctx } from "./core.js";
+export type { JsonValue, JsonObject, JsonArray } from "./types.js";
