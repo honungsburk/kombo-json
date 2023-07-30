@@ -460,7 +460,7 @@ export const objectParser: Parser<JsonObject, Ctx, Err> = A.inContext(
     start: A.Token("{", Err.ExpectedLeftBrace),
     separator: A.Token(",", Err.ExpectedObjectSeparator),
     end: A.Token("}", Err.ExpectedRightBrace),
-    spaces: A.spaces,
+    spaces: whitespaceParser,
     item: A.succeed(
       (key: string) => (value: JsonValue) => [key, value] as const
     )
