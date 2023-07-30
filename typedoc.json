@@ -1,0 +1,30 @@
+{
+  "name": "Kombo JSON",
+  "includeVersion": true,
+  "hideGenerator": true,
+  "out": "docs",
+  "readme": "README.md",
+  "tsconfig": "./tsconfig.json",
+  "cleanOutputDir": true,
+  "sidebarLinks": {
+    "github": "https://github.com/honungsburk/kombo-json",
+    "kombo": "https://github.com/honungsburk/kombo"
+  },
+  "categorizeByGroup": false,
+  "categoryOrder": [
+    "Parsers",
+    "Primitives",
+    "Building Blocks",
+    "Mapping",
+    "Branches",
+    "Loops",
+    "Whitespace",
+    "Chompers",
+    "Indentation",
+    "Positions",
+    "Helpers",
+    "Helper Types",
+    "Result",
+    "*"
+  ]
+}

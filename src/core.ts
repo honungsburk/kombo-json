@@ -1,14 +1,14 @@
 import * as A from "@honungsburk/kombo/Advanced";
-import {
-  Parser,
-  DeadEnd,
-  Located,
-  getContext,
-} from "@honungsburk/kombo/Parser";
+import { Parser, DeadEnd, getContext } from "@honungsburk/kombo/Parser";
 import type { JsonValue, JsonObject, JsonArray } from "./types.js";
 
 // Error
 
+/**
+ * The context in which the parser failed. It lets us know what the parser was doing when it failed.
+ *
+ * @category Error Messages
+ */
 export enum Ctx {
   Value = "Value",
   Object = "Object",
@@ -49,6 +49,12 @@ function ctxToString(ctx: Ctx): string {
       return "Cannot parse the unicode hex in this string.";
   }
 }
+
+/**
+ * The error that occured when parsing.
+ *
+ * @category Error Messages
+ */
 export enum Err {
   ExpectedBool = "ExpectedBool",
   ExpectedNull = "ExpectedNull",
@@ -74,7 +80,7 @@ export enum Err {
   ExpectedArraySeparator = "ExpectedArraySeparator",
 }
 
-export function tipGenerator(ctx: Ctx, err: Err): string[] {
+function tipGenerator(ctx: Ctx, err: Err): string[] {
   if (ctx === Ctx.ObjectKey) {
     return ['"key": value', '"name": "John Doe"', '"age": 42'];
   }
@@ -128,52 +134,58 @@ export function tipGenerator(ctx: Ctx, err: Err): string[] {
   return [];
 }
 
-export function errToString(error: Err): string {
+/**
+ * Convert an error to a string.
+ *
+ * @param error - The error to convert to a string.
+ * @returns a string representation of the error.
+ */
+function errToString(error: Err): string {
   switch (error) {
     case Err.ExpectedBool:
-      return "Expected a boolean value";
+      return "Expected a boolean value.";
     case Err.ExpectedNull:
-      return "Expected a null value";
+      return "Expected a null value.";
     case Err.ExpectedNumber:
-      return "Expected a number";
+      return "Expected a number.";
     case Err.ExpectedDigit:
-      return "Expected a digit";
+      return "Expected a digit.";
     case Err.ExpectedSign:
-      return "Expected a sign: '+' or '-'";
+      return "Expected a sign: '+' or '-'.";
     case Err.ExpectedExponentE:
       return "Expected an exponent.";
     case Err.ExpectedDecimalSeparator:
-      return "Expected a decimal separator";
+      return "Expected a decimal separator.";
     case Err.ExpectedString:
-      return "Expected a string";
+      return "Expected a string.";
     case Err.ExpectedDoubleQuote:
-      return 'Expected a double quote: "';
+      return 'Expected a double quote: ".';
     case Err.ExpectedChar:
       return "Expected a character.";
     case Err.ExpectedUnicodeU:
-      return "Expected a unicode 'u'";
+      return "Expected a unicode 'u'.";
     case Err.ExpectedUnicodeHex:
       return "Expected a unicode hex.";
     case Err.ExpectedEscapedCharacter:
       return "Expected an escaped character.";
     case Err.ExpectedObject:
-      return "Expected an object";
+      return "Expected an object.";
     case Err.ExpectedArray:
-      return "Expected an array";
+      return "Expected an array.";
     case Err.ExpectedLeftBrace:
-      return "Expected a left brace: '{'";
+      return "Expected a left brace: '{'.";
     case Err.ExpectedRightBrace:
-      return "Expected a right brace: '}'";
+      return "Expected a right brace: '}'.";
     case Err.ExpectedObjectSeparator:
-      return "Expected an object separator: ','";
+      return "Expected an object separator: ','.";
     case Err.ExpectedKeyValueSeparator:
-      return "Expected a key value separator: ':'";
+      return "Expected a key value separator: ':'.";
     case Err.ExpectedLeftBracket:
-      return "Expected a left bracket: '['";
+      return "Expected a left bracket: '['.";
     case Err.ExpectedRightBracket:
-      return "Expected a right bracket: ']'";
+      return "Expected a right bracket: ']'.";
     case Err.ExpectedArraySeparator:
-      return "Expected an array separator: ','";
+      return "Expected an array separator: ','.";
   }
 }
 
@@ -206,7 +218,36 @@ function composeErrorMessage(
   ].join("\n");
 }
 
-export const failureToString = (
+/**
+ * Convert a stack of errors to a string.
+ *
+ * @example
+ *
+ * If we have the following invalid JSON:
+ *
+ * ```json
+ * {
+ *  "a": "b
+ * }
+ * ```
+ *
+ * We get the following error message:
+ *
+ * ```txt
+ * Cannot parse this value.
+ *
+ * 2|      "a": "b
+ *                ^
+ * Expected a double quote: "
+ * ```
+ *
+ * @param src the source string you tried to parse
+ * @param errorStack the stack of errors that occured when parsing the source string
+ * @returns undefined if the stack of errors was empty, otherwise a string with the error message
+ *
+ * @category Error Messages
+ */
+export const createErrorMessage = (
   src: string,
   errorStack: DeadEnd<Ctx, Err>[]
 ): string | undefined => {
@@ -216,7 +257,7 @@ export const failureToString = (
     return undefined;
   }
 
-  const top = error.contextStack.peek();
+  const top = error.contextStack.last();
 
   const context: Ctx = top === undefined ? Ctx.Value : getContext(top);
 
@@ -237,13 +278,21 @@ export const failureToString = (
 };
 
 /**
- * Whitespace
+ * Parse whitespace
+ *
+ * @category Parser
  */
 export const whitespaceParser: Parser<false, never, never> = A.chompWhile(
   (c) => c === " " || c === "\n" || c === "\r" || c === "\t"
 );
 
 // Null
+
+/**
+ * Parse null
+ *
+ * @category Parser
+ */
 export const nullParser = A.succeed(null).skip(
   A.symbol(A.Token("null", Err.ExpectedNull))
 );
@@ -257,6 +306,11 @@ const falseParser = A.succeed(false).skip(
   A.symbol(A.Token("false", Err.ExpectedBool))
 );
 
+/**
+ * Parse a boolean
+ *
+ * @category Parser
+ */
 export const boolParser = trueParser.or(falseParser);
 
 // Number
@@ -286,7 +340,12 @@ const exponentParser = A.inContext(Ctx.Exponent)(
     .apply(digitsParser)
 );
 
-export const numberParser: Parser<number, never, Err> = A.inContext(Ctx.Number)(
+/**
+ * Parse a number
+ *
+ * @category Parser
+ */
+export const numberParser: Parser<number, Ctx, Err> = A.inContext(Ctx.Number)(
   A.succeed(
     (sign: number) => (n: number) => (fraction: number) => (exponent: number) =>
       sign * (n + fraction) * exponent
@@ -303,9 +362,12 @@ export const numberParser: Parser<number, never, Err> = A.inContext(Ctx.Number)(
 
 // String
 
-export const unicodeParser: Parser<string, never, Err> = A.inContext(
-  Ctx.Unicode
-)(
+/**
+ * Parse a unicode hex.
+ *
+ * @category Parser
+ */
+export const unicodeParser: Parser<string, Ctx, Err> = A.inContext(Ctx.Unicode)(
   A.succeed((s: string) => String.fromCodePoint(parseInt(s, 16)))
     .skip(A.symbol(A.Token("u", Err.ExpectedUnicodeU)))
     .apply(
@@ -319,7 +381,12 @@ export const unicodeParser: Parser<string, never, Err> = A.inContext(
     )
 );
 
-export const escapeParser: Parser<string, never, Err> = A.symbol(
+/**
+ * Parse an escaped character.
+ *
+ * @category Parser
+ */
+export const escapeParser: Parser<string, Ctx, Err> = A.symbol(
   A.Token("\\", Err.ExpectedEscapedCharacter)
 ).keep(
   A.oneOfMany(
@@ -345,7 +412,12 @@ const charParser = A.chompIf(
 
 const characterParser = A.oneOf(escapeParser, charParser);
 
-export const stringParser: Parser<string, never, Err> = A.inContext(Ctx.String)(
+/**
+ * Parse a String
+ *
+ * @category Parser
+ */
+export const stringParser: Parser<string, Ctx, Err> = A.inContext(Ctx.String)(
   A.succeed((chars: string[]) => chars.join(""))
 )
   .skip(A.symbol(A.Token('"', Err.ExpectedDoubleQuote)))
@@ -353,9 +425,13 @@ export const stringParser: Parser<string, never, Err> = A.inContext(Ctx.String)(
   .skip(A.symbol(A.Token('"', Err.ExpectedDoubleQuote)));
 
 // Value
-export const valueParser: Parser<JsonValue, never, Err> = A.inContext(
-  Ctx.Value
-)(
+
+/**
+ * Parse any JSON value
+ *
+ * @category Parser
+ */
+export const valueParser: Parser<JsonValue, Ctx, Err> = A.inContext(Ctx.Value)(
   whitespaceParser
     .keep(
       A.oneOfMany<JsonValue, never, Err>(
@@ -371,7 +447,13 @@ export const valueParser: Parser<JsonValue, never, Err> = A.inContext(
 );
 
 // Object
-export const objectParser: Parser<JsonObject, never, Err> = A.inContext(
+
+/**
+ * Parse a JSON object
+ *
+ * @category Parser
+ */
+export const objectParser: Parser<JsonObject, Ctx, Err> = A.inContext(
   Ctx.Object
 )(
   A.sequence({
@@ -393,9 +475,13 @@ export const objectParser: Parser<JsonObject, never, Err> = A.inContext(
 );
 
 // Array
-export const arrayParser: Parser<JsonArray, never, Err> = A.inContext(
-  Ctx.Array
-)(
+
+/**
+ * Parse a JSON array
+ *
+ * @category Parser
+ */
+export const arrayParser: Parser<JsonArray, Ctx, Err> = A.inContext(Ctx.Array)(
   A.sequence({
     start: A.Token("[", Err.ExpectedLeftBracket),
     separator: A.Token(",", Err.ExpectedArraySeparator),

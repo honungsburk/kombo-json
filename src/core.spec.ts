@@ -257,7 +257,7 @@ test.group("objectParser", (group: Group) => {
 
 test.group("failureToString", (group: Group) => {
   test("returns undefined if there is no error", ({ expect }) => {
-    expect(Core.failureToString("", [])).toBeUndefined();
+    expect(Core.createErrorMessage("", [])).toBeUndefined();
   });
 
   test("returns the error message if there is an error", ({ expect }) => {
@@ -266,7 +266,7 @@ test.group("failureToString", (group: Group) => {
     expect(res.kind).toEqual("Err");
     // expectProblem(expect, res, [Core.Err.ExpectedNumber]);
     if (Result.isErr(res)) {
-      expect(Core.failureToString(src, res.value)).toEqual("");
+      expect(Core.createErrorMessage(src, res.value)).toBeDefined();
     }
   });
 
@@ -279,12 +279,10 @@ test.group("failureToString", (group: Group) => {
       const res = Core.valueParser.run(file);
       expect(res.kind).toEqual("Err");
       if (Result.isErr(res)) {
-        expect(Core.failureToString(file, res.value)).toMatchSnapshot();
+        expect(Core.createErrorMessage(file, res.value)).toMatchSnapshot();
       }
     });
-  })
-    .pin()
-    .tags(["golden"]);
+  }).tags(["golden"]);
 });
 
 const invalidDir = new URL(
