@@ -1,6 +1,6 @@
 {
   "name": "@honungsburk/kombo-json",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A json parser built on top of kombo",
   "author": "Frank Hampus Weslien (https://honungsburk.github.io/)",
   "license": "BSD-3-Clause",
@@ -46,6 +46,14 @@
     ".": {
       "import": "./dist/mjs/index.js",
       "require": "./dist/cjs/index.js"
+    },
+    "./Core": {
+      "import": "./dist/mjs/core.js",
+      "require": "./dist/cjs/core.js"
+    },
+    "./Types": {
+      "import": "./dist/mjs/types.js",
+      "require": "./dist/cjs/types.js"
     }
   },
   "peerDependencies": {
